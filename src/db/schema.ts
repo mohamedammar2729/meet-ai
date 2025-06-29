@@ -26,7 +26,9 @@ export const session = pgTable('session', {
   userAgent: text('user_agent'),
   // userId is Foreign key to user table
   // when user is deleted, all sessions for that user are also deleted
-  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
 });
 
 export const account = pgTable('account', {
@@ -35,7 +37,9 @@ export const account = pgTable('account', {
   providerId: text('provider_id').notNull(),
   // userId is Foreign key to user table
   // when user is deleted, all accounts for that user are also deleted
-  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   idToken: text('id_token'),
@@ -59,4 +63,3 @@ export const verification = pgTable('verification', {
     () => /* @__PURE__ */ new Date()
   ),
 });
-  
