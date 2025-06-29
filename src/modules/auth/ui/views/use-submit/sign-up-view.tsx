@@ -11,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { FaGithub, FaGoogle } from 'react-icons/fa';
 import { authClient } from '@/lib/auth-client';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
@@ -46,15 +47,36 @@ export const SignUpView = () => {
         name: data.name,
         email: data.email,
         password: data.password,
+        callbackURL: '/',
       },
       {
         onSuccess: () => {
           setPending(false);
-          router.push('/sign-in');
+          router.push('/');
         },
-        onError: (error) => {
+        onError: ({ error }) => {
           setPending(false);
-          setError(error.error.message);
+          setError(error.message);
+        },
+      }
+    );
+  };
+
+  const onSocial = (provider: 'github' | 'google') => {
+    setError(null);
+    setPending(true);
+    authClient.signIn.social(
+      {
+        provider: provider,
+        callbackURL: '/',
+      },
+      {
+        onSuccess: () => {
+          setPending(false);
+        },
+        onError: ({ error }) => {
+          setPending(false);
+          setError(error.message);
         },
       }
     );
@@ -171,18 +193,20 @@ export const SignUpView = () => {
                   <Button
                     variant='outline'
                     type='button'
+                    onClick={() => onSocial('google')}
                     className='w-full'
                     disabled={pending}
                   >
-                    Google
+                    <FaGoogle />
                   </Button>
                   <Button
                     variant='outline'
                     type='button'
+                    onClick={() => onSocial('github')}
                     className='w-full'
                     disabled={pending}
                   >
-                    GitHub
+                    <FaGithub />
                   </Button>
                 </div>
                 <div className='text-sm text-center'>

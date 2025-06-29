@@ -32,7 +32,7 @@ function SignUpForm() {
   const router = useRouter();
   const [state, action, pending] = useActionState(signup, initialState);
   const { getFormFields } = useFormFields({
-    slug: Pages.Register,
+    slug: Pages.REGISTER,
   });
 
   useEffect(() => {
