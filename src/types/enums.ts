@@ -22,7 +22,7 @@ export enum Directions {
   
   export enum Pages {
     LOGIN = "sign-in",
-    Register = "sign-up",
+    REGISTER = "sign-up",
     FORGOT_PASSWORD = "forgot-password",
     CATEGORIES = "categories",
     MENU_ITEMS = "menu-items",

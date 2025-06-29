@@ -50,7 +50,7 @@ const useFormFields = ({ slug }: IFormFieldsVariables) => {
     switch (slug) {
       case Pages.LOGIN:
         return loginFields();
-      case Pages.Register:
+      case Pages.REGISTER:
         return signupFields();
       default:
         return [];
