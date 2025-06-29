@@ -21,11 +21,11 @@ const TextField = ({
   readOnly,
 }: Props) => {
   return (
-    <div className="space-y-2">
-      <Label 
-        htmlFor={name} 
+    <div className='space-y-2'>
+      <Label
+        htmlFor={name}
         className={`capitalize mb-2 ${
-          error && error[name] ? "text-destructive" : "text-black"
+          error && error[name] ? 'text-destructive' : 'text-black'
         }`}
       >
         {label}
@@ -41,13 +41,9 @@ const TextField = ({
         readOnly={readOnly}
         aria-invalid={!!(error && error[name])}
       />
-      {error && error[name] && (
-        <p
-          className={`text-accent mt-2 text-sm font-medium ${
-            error[name] ? "text-destructive" : ""
-          }`}
-        >
-          {error[name]}
+      {error?.[name] && (
+        <p className='text-destructive mt-2 text-sm font-medium'>
+          {Array.isArray(error[name]) ? error[name][0] : error[name]}
         </p>
       )}
     </div>

@@ -21,7 +21,6 @@ export interface IFormField {
   placeholder?: string;
   disabled?: boolean;
   autoFocus?: boolean;
-  options?: IOption;
   id?: string;
   defaultValue?: string;
   readOnly?: boolean;
