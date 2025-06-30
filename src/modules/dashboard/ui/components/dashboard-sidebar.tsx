@@ -113,7 +113,7 @@ export const SidebarDashboard = () => {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className='text-white' />
+      <SidebarFooter />
       <DashBoardUserButton />
     </Sidebar>
   );
