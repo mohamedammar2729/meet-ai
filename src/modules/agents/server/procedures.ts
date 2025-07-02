@@ -2,7 +2,7 @@ import { db } from '@/db';
 import { z } from 'zod';
 import { agents } from '@/db/schema';
 import { createTRPCRouter, protectedProcedure } from '@/trpc/init';
-import { agentsInsertSchema } from '../schemas';
+import { agentsInsertSchema, agentsUpdateSchema } from '../schemas';
 import { and, count, desc, eq, getTableColumns, ilike, sql } from 'drizzle-orm';
 import {
   DEFAULT_PAGE,
@@ -14,6 +14,63 @@ import { TRPCError } from '@trpc/server';
 
 // This is a tRPC helper function. It is used to create a group of API endpoints (we call these procedures).
 export const agentsRouter = createTRPCRouter({
+  // Defines a new API endpoint called "remove" for remove an agent
+  remove: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // Deletes an agent from the database based on the provided ID
+      const [removedAgent] = await db
+        .delete(agents)
+        // Specifies the table to delete from
+        .where(
+          and(
+            eq(agents.id, input.id), // Matches the agent by ID
+            eq(agents.userId, ctx.auth.user.id) // Ensures the agent belongs to the authenticated user
+          )
+        )
+        // Returns the deleted agent record
+        .returning();
+      // If no agent was removed, it means the agent does not exist or does not belong to the user
+      if (!removedAgent) {
+        // Throws an error if the agent does not exist
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Agent not found' });
+      }
+      // Returns the removed agent record
+      return removedAgent;
+    }),
+
+  // Defines a new API endpoint called "update" for updating an agent
+  update: protectedProcedure
+    // Input validation schema for the update operation
+    .input(agentsUpdateSchema)
+    // Defines this as a mutation operation (changes data in the database)
+    .mutation(async ({ input, ctx }) => {
+      // Updates an agent in the database with the provided input
+      const [updatedAgent] = await db
+        .update(agents)
+        // Specifies the table to update
+        .set({
+          name: input.name,
+          instructions: input.instructions,
+        })
+        // Adds a WHERE condition to find the agent with the specified ID
+        .where(
+          and(
+            eq(agents.id, input.id),
+            eq(agents.userId, ctx.auth.user.id) // Ensures the agent belongs to the authenticated user
+          )
+        )
+        // Returns the updated agent record
+        .returning();
+      // If no agent was updated, it means the agent does not exist or does not belong to the user
+      if (!updatedAgent) {
+        // Throws an error if the agent does not exist
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Agent not found' });
+      }
+      // Returns the updated agent record
+      return updatedAgent;
+    }),
+
   // Defines a new API endpoint called "getOne" for retrieving a single agent
   getOne: protectedProcedure
     // Defines the input validation for this procedure, Requires an object with an id field that must be a string
