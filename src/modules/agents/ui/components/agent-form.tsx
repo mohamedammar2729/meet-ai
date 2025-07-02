@@ -40,7 +40,7 @@ export const AgentForm = ({
       onSuccess: async () => {
         // trpc.agents.getMany.queryOptions() returns the query options for the getMany procedure
         // this is used to refetch the list of agents after creating a new agent
-        await queryClient.invalidateQueries(trpc.agents.getMany.queryOptions());
+        await queryClient.invalidateQueries(trpc.agents.getMany.queryOptions({}));
         // if (inititialValues?.id) means we are editing an existing agent
         if (inititialValues?.id) {
           // if we are editing an existing agent, we need to refetch the agent details
