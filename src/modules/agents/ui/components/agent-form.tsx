@@ -24,13 +24,13 @@ import { toast } from 'sonner';
 interface AgentFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
-  inititialValues?: AgentGetOne;
+  initialValues?: AgentGetOne;
 }
 
 export const AgentForm = ({
   onSuccess,
   onCancel,
-  inititialValues,
+  initialValues,
 }: AgentFormProps) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -40,15 +40,9 @@ export const AgentForm = ({
       onSuccess: async () => {
         // trpc.agents.getMany.queryOptions() returns the query options for the getMany procedure
         // this is used to refetch the list of agents after creating a new agent
-        await queryClient.invalidateQueries(trpc.agents.getMany.queryOptions({}));
-        // if (inititialValues?.id) means we are editing an existing agent
-        if (inititialValues?.id) {
-          // if we are editing an existing agent, we need to refetch the agent details
-          // to update the agent details in the list
-          queryClient.invalidateQueries(
-            trpc.agents.getOne.queryOptions({ id: inititialValues.id })
-          );
-        }
+        await queryClient.invalidateQueries(
+          trpc.agents.getMany.queryOptions({})
+        );
         // if onSuccess is provided, call it
         onSuccess?.();
       },
@@ -59,22 +53,51 @@ export const AgentForm = ({
     })
   );
 
+  const updateAgent = useMutation(
+    trpc.agents.update.mutationOptions({
+      onSuccess: async () => {
+        // Invalidate the queries to refetch the data
+        await queryClient.invalidateQueries(
+          trpc.agents.getMany.queryOptions({})
+        );
+        // If we are editing an existing agent, we need to refetch the agent details
+        // to update the agent details in the list
+        if (initialValues?.id) {
+          // Invalidate the query for the specific agent
+          // to ensure the updated data is fetched
+          queryClient.invalidateQueries(
+            trpc.agents.getOne.queryOptions({ id: initialValues.id })
+          );
+        }
+        // If onSuccess is provided, call it
+        // This is useful to close the dialog or redirect the user
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
   const form = useForm<z.infer<typeof agentsInsertSchema>>({
     resolver: zodResolver(agentsInsertSchema),
     defaultValues: {
-      name: inititialValues?.name || '',
-      instructions: inititialValues?.instructions || '',
+      name: initialValues?.name || '',
+      instructions: initialValues?.instructions || '',
     },
   });
   // isEdit is used to determine if the form is in edit mode or create mode
-  const isEdit = !!inititialValues?.id;
+  const isEdit = !!initialValues?.id;
   // isPending is used to determine if the mutation is pending
   // it is used to disable the form while the mutation is in progress
-  const isPending = createAgent.isPending;
+  const isPending = createAgent.isPending || updateAgent.isPending;
 
   const onSubmit = async (data: z.infer<typeof agentsInsertSchema>) => {
     if (isEdit) {
-      console.log('TODO: Implement update agent logic');
+      updateAgent.mutate({
+        ...data,
+        id: initialValues?.id, // Ensure id is provided for update
+      });
     } else {
       createAgent.mutate(data);
     }
