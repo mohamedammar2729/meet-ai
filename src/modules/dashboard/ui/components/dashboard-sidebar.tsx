@@ -23,7 +23,7 @@ import { DashBoardUserButton } from './dashboard-user-button';
 const firstSection = [
   {
     icon: VideoIcon,
-    href: '/meeting',
+    href: '/meetings',
     label: 'Meetings',
   },
   {
