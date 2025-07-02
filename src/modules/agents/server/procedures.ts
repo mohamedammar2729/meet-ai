@@ -10,6 +10,7 @@ import {
   MAX_PAGE_SIZE,
   MIN_PAGE_SIZE,
 } from '@/constants';
+import { TRPCError } from '@trpc/server';
 
 // This is a tRPC helper function. It is used to create a group of API endpoints (we call these procedures).
 export const agentsRouter = createTRPCRouter({
@@ -18,7 +19,7 @@ export const agentsRouter = createTRPCRouter({
     // Defines the input validation for this procedure, Requires an object with an id field that must be a string
     .input(z.object({ id: z.string() }))
     // Defines this as a query operation (read-only, doesn't modify data)Takes the validated input as a parameter
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       // Uses array destructuring because Drizzle returns arrays, but we only want the first item
       const [existingAgent] = await db
         .select({
@@ -30,7 +31,18 @@ export const agentsRouter = createTRPCRouter({
         .from(agents)
         // Adds a WHERE condition to find the agent with the specified ID
         // Uses the eq function to create an equality comparison
-        .where(eq(agents.id, input.id));
+        .where(
+          and(
+            eq(agents.id, input.id),
+            eq(agents.userId, ctx.auth.user.id) // Ensures the agent belongs to the authenticated user
+          )
+        );
+
+      // If no agent is found, existingAgent will be undefined
+      if (!existingAgent) {
+        // Throws an error if the agent does not exist
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Agent not found' });
+      }
 
       return existingAgent;
     }),
