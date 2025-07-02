@@ -1,0 +1,120 @@
+import { db } from '@/db';
+import { z } from 'zod';
+import { meetings } from '@/db/schema';
+import { createTRPCRouter, protectedProcedure } from '@/trpc/init';
+import { and, count, desc, eq, getTableColumns, ilike } from 'drizzle-orm';
+import {
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
+} from '@/constants';
+import { TRPCError } from '@trpc/server';
+
+// This is a tRPC helper function. It is used to create a group of API endpoints (we call these procedures).
+export const meetingsRouter = createTRPCRouter({
+  // Defines a new API endpoint called "getOne" for retrieving a single agent
+  getOne: protectedProcedure
+    // Defines the input validation for this procedure, Requires an object with an id field that must be a string
+    .input(z.object({ id: z.string() }))
+    // Defines this as a query operation (read-only, doesn't modify data)Takes the validated input as a parameter
+    .query(async ({ input, ctx }) => {
+      // Uses array destructuring because Drizzle returns arrays, but we only want the first item
+      const [existingMeeting] = await db
+        .select({
+          // Spreads all actual columns from the meetings table
+          ...getTableColumns(meetings),
+        })
+        // Specifies we're querying from the meetings table
+        .from(meetings)
+        // Adds a WHERE condition to find the meetings with the specified ID
+        // Uses the eq function to create an equality comparison
+        .where(
+          and(
+            eq(meetings.id, input.id),
+            eq(meetings.userId, ctx.auth.user.id) // Ensures the agent belongs to the authenticated user
+          )
+        );
+
+      // If no Meeting is found, existingMeeting will be undefined
+      if (!existingMeeting) {
+        // Throws an error if the Meeting does not exist
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Meeting not found',
+        });
+      }
+
+      return existingMeeting;
+    }),
+
+  // Defines a new API endpoint called "getMany" to fetch multiple agents (with pagination and search)
+  getMany: protectedProcedure
+    // Input validation schema
+    .input(
+      z.object({
+        page: z.number().default(DEFAULT_PAGE),
+        pageSize: z
+          .number()
+          .min(MIN_PAGE_SIZE)
+          .max(MAX_PAGE_SIZE)
+          .default(DEFAULT_PAGE_SIZE),
+        // Optional search term that can be null or undefined
+        search: z.string().nullish(),
+      })
+    )
+    // Defines as a query operation Takes both context (ctx) and input parameters
+    // .query(...) means this is a read-only procedure (unlike .mutation() which changes data)
+    .query(async ({ ctx, input }) => {
+      // Destructures the input parameters
+      const { page, pageSize, search } = input;
+      // Database query setup like the previous one, but with pagination and search
+      const data = await db
+        .select({
+          // to preserve other fields used ...getTebleColumns
+          ...getTableColumns(meetings),
+        })
+        // Specifies we're querying from the meetings table
+        .from(meetings)
+        .where(
+          // and(): Combines multiple conditions
+          and(
+            // Only shows meetings belonging to the authenticated user
+            eq(meetings.userId, ctx.auth.user.id),
+            // If search term exists, filter by meetings name using case-insensitive partial matching
+            input?.search ? ilike(meetings.name, `%${search}%`) : undefined
+          )
+        )
+        // if two meetings have the same creation date, order by ID in descending order
+        .orderBy(desc(meetings.createdAt), desc(meetings.id))
+        // Limits the number of results to the specified page size
+        .limit(pageSize)
+        // Calculates the offset for pagination
+        .offset((page - 1) * pageSize);
+
+      // Returns the paginated data
+      // The data will be an array of agents that match the search criteria
+      // The total count of agents for the authenticated user, used for pagination
+      const [total] = await db
+        .select({ count: count() })
+        .from(meetings)
+        .where(
+          and(
+            eq(meetings.userId, ctx.auth.user.id),
+            input?.search ? ilike(meetings.name, `%${search}%`) : undefined
+          )
+        );
+      // Calculates the total number of pages based on the total count and page size
+      const totalPages = Math.ceil(total.count / pageSize);
+
+      return {
+        items: data,
+        total: total.count,
+        totalPages,
+      };
+    }),
+});
+
+// if there is wrong in name or instructions
+// it will throw an error with the message from the schema validation .input(agentsInsertSchema)
+// if there is no userId in the session, it will throw an error with the message 'UNAUTHORIZED'

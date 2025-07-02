@@ -52,7 +52,7 @@ export const AgentsViewLoading = () => {
   return (
     <LoadingState
       title='Loading Agents'
-      describtion='This is may take a few seconds'
+      description='This is may take a few seconds'
     />
   );
 };
@@ -61,7 +61,7 @@ export const AgentsViewError = () => {
   return (
     <ErrorState
       title='Error Loading Agents'
-      describtion='Something went wrong while loading agents. Please try again later.'
+      description='Something went wrong while loading agents. Please try again later.'
     />
   );
 };
