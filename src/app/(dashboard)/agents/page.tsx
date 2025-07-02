@@ -1,9 +1,11 @@
-import { ErrorState } from '@/components/error-state';
-import { LoadingState } from '@/components/loading-state';
 import { auth } from '@/lib/auth';
 import { loadSearchParams } from '@/modules/agents/params';
 import { AgentsListHeaders } from '@/modules/agents/ui/components/agents-list-header';
-import { AgentsView } from '@/modules/agents/ui/views/agents-view';
+import {
+  AgentsView,
+  AgentsViewError,
+  AgentsViewLoading,
+} from '@/modules/agents/ui/views/agents-view';
 import { getQueryClient, trpc } from '@/trpc/server';
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { headers } from 'next/headers';
@@ -39,22 +41,8 @@ const Page = async ({ searchParams }: Props) => {
     <>
       <AgentsListHeaders />
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <Suspense
-          fallback={
-            <LoadingState
-              title='Loading Agents'
-              describtion='This is may take a few seconds'
-            />
-          }
-        >
-          <ErrorBoundary
-            fallback={
-              <ErrorState
-                title='Error Loading Agents'
-                describtion='Something went wrong while loading agents. Please try again later.'
-              />
-            }
-          >
+        <Suspense fallback={<AgentsViewLoading />}>
+          <ErrorBoundary fallback={<AgentsViewError />}>
             <AgentsView />
           </ErrorBoundary>
         </Suspense>
