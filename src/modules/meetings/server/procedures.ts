@@ -10,9 +10,67 @@ import {
   MIN_PAGE_SIZE,
 } from '@/constants';
 import { TRPCError } from '@trpc/server';
+import { meetingsInsertSchema, meetingsUpdateSchema } from '../schemas';
 
 // This is a tRPC helper function. It is used to create a group of API endpoints (we call these procedures).
 export const meetingsRouter = createTRPCRouter({
+  // Defines a new API endpoint called "create" for creating meetings
+  create: protectedProcedure
+    // Applies the meetingsInsertSchema validation rules to incoming data
+    .input(meetingsInsertSchema)
+    // The user's authentication info is available in the ctx (context)
+    // defining a mutation, which means this function is used to modify data (e.g., create, update, or delete something in your database).
+    .mutation(async ({ input, ctx }) => {
+      const [createdMeeting] = await db
+        // Drizzle ORM's .insert() method always returns an array of inserted records
+        // Tells Drizzle to insert data into the agents table
+        .insert(meetings)
+        // Specifies what data to insert into the database
+        .values({
+          ...input,
+          userId: ctx.auth.user.id,
+        })
+        // Tells the database to return the complete inserted record
+        .returning();
+      //TODO: create stream call, upsert stream users
+
+      // API response: Sends the newly created agent back to the client
+      return createdMeeting;
+    }),
+
+  // Defines a new API endpoint called "update" for updating an existing meeting
+  update: protectedProcedure
+    // Applies the meetingsInsertSchema validation rules to incoming data
+    .input(meetingsUpdateSchema)
+    // Defines this as a mutation operation (changes data)
+    .mutation(async ({ input, ctx }) => {
+      // Uses array destructuring because Drizzle returns arrays, but we only want the first item
+      const [updatedMeeting] = await db
+        // Tells Drizzle to update the meetings table
+        .update(meetings)
+        // Specifies the new values to update
+        .set(input)
+        // Adds a WHERE condition to find the meeting with the specified ID
+        .where(
+          and(
+            eq(meetings.id, input.id),
+            eq(meetings.userId, ctx.auth.user.id) // Ensures the meeting belongs to the authenticated user
+          )
+        )
+        // Tells Drizzle to return the updated record
+        .returning();
+
+      // If no Meeting is found, updatedMeeting will be undefined
+      if (!updatedMeeting) {
+        // Throws an error if the Meeting does not exist
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Meeting not found',
+        });
+      }
+
+      return updatedMeeting;
+    }),
   // Defines a new API endpoint called "getOne" for retrieving a single agent
   getOne: protectedProcedure
     // Defines the input validation for this procedure, Requires an object with an id field that must be a string
