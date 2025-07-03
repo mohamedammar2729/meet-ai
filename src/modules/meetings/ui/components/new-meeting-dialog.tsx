@@ -17,13 +17,14 @@ export const NewMeetingDialog = ({
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
-      title='New Agent'
+      title='New Meeting'
       description='Create a new meeting'
     >
       <MeetingForm
         onSuccess={(id) => {
-          onOpenChange(false)
-        router.push(`/meetings/${id}`)}}
+          onOpenChange(false);
+          router.push(`/meetings/${id}`);
+        }}
         onCancel={() => onOpenChange(false)}
       />
     </ResponsiveDialog>

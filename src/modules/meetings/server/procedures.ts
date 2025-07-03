@@ -1,8 +1,8 @@
 import { db } from '@/db';
 import { z } from 'zod';
-import { meetings } from '@/db/schema';
+import { agents, meetings } from '@/db/schema';
 import { createTRPCRouter, protectedProcedure } from '@/trpc/init';
-import { and, count, desc, eq, getTableColumns, ilike } from 'drizzle-orm';
+import { and, count, desc, eq, getTableColumns, ilike, sql } from 'drizzle-orm';
 import {
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
@@ -131,9 +131,20 @@ export const meetingsRouter = createTRPCRouter({
         .select({
           // to preserve other fields used ...getTebleColumns
           ...getTableColumns(meetings),
+          agent: agents,
+          // Calculates the duration of the meeting in seconds
+          // Uses SQL to calculate the duration between ended_at and started_at timestamps
+          duration: sql<number>`EXTRACT(EPOCH FROM (ended_at - started_at))`.as('duration'),
         })
         // Specifies we're querying from the meetings table
         .from(meetings)
+        // Joins the agents table to get agent details
+        // This allows us to access agent information related to each meeting
+        .innerJoin(
+          agents, // Joins the agents table to get agent details
+          eq(meetings.agentId, agents.id) // Matches meetings.agentId with agents.id
+        )
+        // Adds a WHERE condition to filter meetings
         .where(
           // and(): Combines multiple conditions
           and(
@@ -156,6 +167,7 @@ export const meetingsRouter = createTRPCRouter({
       const [total] = await db
         .select({ count: count() })
         .from(meetings)
+        .innerJoin(agents, eq(meetings.agentId, agents.id))
         .where(
           and(
             eq(meetings.userId, ctx.auth.user.id),
