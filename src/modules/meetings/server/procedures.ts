@@ -11,6 +11,7 @@ import {
 } from '@/constants';
 import { TRPCError } from '@trpc/server';
 import { meetingsInsertSchema, meetingsUpdateSchema } from '../schemas';
+import { MeetingStatus } from '../types';
 
 // This is a tRPC helper function. It is used to create a group of API endpoints (we call these procedures).
 export const meetingsRouter = createTRPCRouter({
@@ -119,13 +120,23 @@ export const meetingsRouter = createTRPCRouter({
           .default(DEFAULT_PAGE_SIZE),
         // Optional search term that can be null or undefined
         search: z.string().nullish(),
+        agentId: z.string().nullish(), // Optional agentId for filtering
+        status: z
+          .enum([
+            MeetingStatus.Upcoming,
+            MeetingStatus.Active,
+            MeetingStatus.Completed,
+            MeetingStatus.Processing,
+            MeetingStatus.Cancelled,
+          ])
+          .nullish(), // Optional status for filtering
       })
     )
     // Defines as a query operation Takes both context (ctx) and input parameters
     // .query(...) means this is a read-only procedure (unlike .mutation() which changes data)
     .query(async ({ ctx, input }) => {
       // Destructures the input parameters
-      const { page, pageSize, search } = input;
+      const { page, pageSize, search, status, agentId } = input;
       // Database query setup like the previous one, but with pagination and search
       const data = await db
         .select({
@@ -134,7 +145,9 @@ export const meetingsRouter = createTRPCRouter({
           agent: agents,
           // Calculates the duration of the meeting in seconds
           // Uses SQL to calculate the duration between ended_at and started_at timestamps
-          duration: sql<number>`EXTRACT(EPOCH FROM (ended_at - started_at))`.as('duration'),
+          duration: sql<number>`EXTRACT(EPOCH FROM (ended_at - started_at))`.as(
+            'duration'
+          ),
         })
         // Specifies we're querying from the meetings table
         .from(meetings)
@@ -151,7 +164,9 @@ export const meetingsRouter = createTRPCRouter({
             // Only shows meetings belonging to the authenticated user
             eq(meetings.userId, ctx.auth.user.id),
             // If search term exists, filter by meetings name using case-insensitive partial matching
-            input?.search ? ilike(meetings.name, `%${search}%`) : undefined
+            search ? ilike(meetings.name, `%${search}%`) : undefined,
+            status ? eq(meetings.status, status) : undefined, // Filters by meeting status if provided
+            agentId ? eq(meetings.agentId, agentId) : undefined // Filters by agent ID if provided
           )
         )
         // if two meetings have the same creation date, order by ID in descending order
@@ -171,7 +186,9 @@ export const meetingsRouter = createTRPCRouter({
         .where(
           and(
             eq(meetings.userId, ctx.auth.user.id),
-            input?.search ? ilike(meetings.name, `%${search}%`) : undefined
+            search ? ilike(meetings.name, `%${search}%`) : undefined,
+            status ? eq(meetings.status, status) : undefined, // Filters by meeting status if provided
+            agentId ? eq(meetings.agentId, agentId) : undefined // Filters by agent ID if provided
           )
         );
       // Calculates the total number of pages based on the total count and page size
