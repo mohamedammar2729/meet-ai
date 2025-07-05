@@ -100,7 +100,7 @@ export const AgentsIdViewLoading = () => {
   return (
     <LoadingState
       title='Loading Agent'
-      describtion='This is may take a few seconds'
+      description='This is may take a few seconds'
     />
   );
 };
@@ -109,7 +109,7 @@ export const AgentsIdViewError = () => {
   return (
     <ErrorState
       title='Error Loading Agent'
-      describtion='Something went wrong while loading agents. Please try again later.'
+      description='Something went wrong while loading agents. Please try again later.'
     />
   );
 };

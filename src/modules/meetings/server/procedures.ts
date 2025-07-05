@@ -72,6 +72,39 @@ export const meetingsRouter = createTRPCRouter({
 
       return updatedMeeting;
     }),
+
+  // Defines a new API endpoint called "remove" for deleting an existing meeting
+  remove: protectedProcedure
+    // Defines the input validation for this procedure, Requires an object with an id field that must be a string
+    .input(z.object({ id: z.string() }))
+    // Defines this as a mutation operation (changes data)
+    .mutation(async ({ input, ctx }) => {
+      // Uses array destructuring because Drizzle returns arrays, but we only want the first item
+      const [removedMeeting] = await db
+        // Tells Drizzle to delete from the meetings table
+        .delete(meetings)
+        // Adds a WHERE condition to find the meeting with the specified ID
+        .where(
+          and(
+            eq(meetings.id, input.id),
+            eq(meetings.userId, ctx.auth.user.id) // Ensures the meeting belongs to the authenticated user
+          )
+        )
+        // Tells Drizzle to return the deleted record
+        .returning();
+
+      // If no Meeting is found, deletedMeeting will be undefined
+      if (!removedMeeting) {
+        // Throws an error if the Meeting does not exist
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Meeting not found',
+        });
+      }
+
+      return removedMeeting;
+    }),
+
   // Defines a new API endpoint called "getOne" for retrieving a single agent
   getOne: protectedProcedure
     // Defines the input validation for this procedure, Requires an object with an id field that must be a string
@@ -83,11 +116,21 @@ export const meetingsRouter = createTRPCRouter({
         .select({
           // Spreads all actual columns from the meetings table
           ...getTableColumns(meetings),
+          agent: agents,
+          // Calculates the duration of the meeting in seconds
+          // Uses SQL to calculate the duration between ended_at and started_at timestamps
+          duration: sql<number>`EXTRACT(EPOCH FROM (ended_at - started_at))`.as(
+            'duration'
+          ),
         })
         // Specifies we're querying from the meetings table
         .from(meetings)
         // Adds a WHERE condition to find the meetings with the specified ID
         // Uses the eq function to create an equality comparison
+        .innerJoin(
+          agents, // Joins the agents table to get agent details
+          eq(meetings.agentId, agents.id) // Matches meetings.agentId with agents.id
+        )
         .where(
           and(
             eq(meetings.id, input.id),
