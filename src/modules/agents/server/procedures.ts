@@ -139,7 +139,7 @@ export const agentsRouter = createTRPCRouter({
             // Only shows agents belonging to the authenticated user
             eq(agents.userId, ctx.auth.user.id),
             // If search term exists, filter by agent name using case-insensitive partial matching
-            search ? ilike(agents.name, `%${search}%`) : undefined
+            search?ilike(agents.name, `%${search}%`) : undefined
           )
         )
         // if two agents have the same creation date, order by ID in descending order
@@ -158,7 +158,7 @@ export const agentsRouter = createTRPCRouter({
         .where(
           and(
             eq(agents.userId, ctx.auth.user.id),
-            search ? ilike(agents.name, `%${search}%`) : undefined
+            search?ilike(agents.name, `%${search}%`) : undefined
           )
         );
       // Calculates the total number of pages based on the total count and page size
