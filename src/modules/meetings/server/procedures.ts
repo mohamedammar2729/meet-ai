@@ -28,7 +28,7 @@ export const meetingsRouter = createTRPCRouter({
           ctx.auth.user.image ??
           generateAvatarUri({
             seed: ctx.auth.user.name,
-            variant: 'botttsNeutral',
+            variant: 'initials',
           }),
       },
     ]);
@@ -108,8 +108,8 @@ export const meetingsRouter = createTRPCRouter({
 
       await streamVideo.upsertUsers([
         {
-          id: ctx.auth.user.id,
-          name: ctx.auth.user.name,
+          id: existingAgent.id,
+          name: existingAgent.name,
           role: 'user',
           image: generateAvatarUri({
             seed: existingAgent.name,
