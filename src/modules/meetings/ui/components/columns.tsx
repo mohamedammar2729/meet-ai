@@ -14,16 +14,10 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { MeetingGetMany } from '../../types';
-import  humanizeDuration  from 'humanize-duration';
-import { cn } from '@/lib/utils';
 
-function formatDuration(duration: number) {
-  return humanizeDuration(duration * 1000, {
-    largest: 1,
-    round: true,
-    units: ['h', 'm', 's'],
-  });
-}
+import { cn, formatDuration } from '@/lib/utils';
+
+
 
 const statusIconMap = {
   upcoming: ClockArrowUpIcon,
