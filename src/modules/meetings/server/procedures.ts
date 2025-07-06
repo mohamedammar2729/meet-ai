@@ -12,9 +12,41 @@ import {
 import { TRPCError } from '@trpc/server';
 import { meetingsInsertSchema, meetingsUpdateSchema } from '../schemas';
 import { MeetingStatus } from '../types';
+import { streamVideo } from '@/lib/stream-video';
+import { generateAvatarUri } from '@/lib/avatar';
 
 // This is a tRPC helper function. It is used to create a group of API endpoints (we call these procedures).
 export const meetingsRouter = createTRPCRouter({
+  generateToken: protectedProcedure.mutation(async ({ ctx }) => {
+    // add user to stream video list of users
+    await streamVideo.upsertUsers([
+      {
+        id: ctx.auth.user.id,
+        name: ctx.auth.user.name,
+        role: 'admin',
+        image:
+          ctx.auth.user.image ??
+          generateAvatarUri({
+            seed: ctx.auth.user.name,
+            variant: 'botttsNeutral',
+          }),
+      },
+    ]);
+    // now create actial token for the user
+    const expirationTime = Math.floor(Date.now() / 1000) + 60 * 60; // 1 hour from now
+    const issuedAt = Math.floor(Date.now() / 1000) - 60; // 1 minute ago
+
+    // Generate a user token using the Stream Video SDK
+    // id must match the user id in stream video list of users
+    const token = streamVideo.generateUserToken({
+      user_id: ctx.auth.user.id,
+      exp: expirationTime,
+      validity_in_seconds: issuedAt,
+    });
+
+    return token;
+  }),
+
   // Defines a new API endpoint called "create" for creating meetings
   create: protectedProcedure
     // Applies the meetingsInsertSchema validation rules to incoming data
@@ -35,7 +67,57 @@ export const meetingsRouter = createTRPCRouter({
         .returning();
       //TODO: create stream call, upsert stream users
 
-      // API response: Sends the newly created agent back to the client
+      // Create a video call using the Stream Video SDK
+      // the 'default' channel is used for the meeting
+      // 'createdMeeting.id' is will aassociate the call with the meeting
+      const call = streamVideo.video.call('default', createdMeeting.id);
+
+      await call.create({
+        data: {
+          created_by_id: ctx.auth.user.id,
+          custom: {
+            meetingId: createdMeeting.id,
+            meetingName: createdMeeting.name,
+          },
+          settings_override: {
+            transcription: {
+              language: 'en',
+              mode: 'auto-on',
+              closed_caption_mode: 'auto-on',
+            },
+            recording: {
+              mode: 'auto-on',
+              quality: '1080p',
+            },
+          },
+        },
+      });
+      // we have to fetch an existing agent that this newly created meeting
+      const [existingAgent] = await db
+        .select()
+        .from(agents)
+        .where(eq(agents.id, createdMeeting.agentId));
+      // If no Meeting is found, existingMeeting will be undefined
+      if (!existingAgent) {
+        // Throws an error if the Meeting does not exist
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Agent not found',
+        });
+      }
+
+      await streamVideo.upsertUsers([
+        {
+          id: ctx.auth.user.id,
+          name: ctx.auth.user.name,
+          role: 'user',
+          image: generateAvatarUri({
+            seed: existingAgent.name,
+            variant: 'botttsNeutral',
+          }),
+        },
+      ]);
+
       return createdMeeting;
     }),
 
