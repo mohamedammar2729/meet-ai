@@ -1,7 +1,7 @@
 import { db } from '@/db';
 import { z } from 'zod';
 import { agents } from '@/db/schema';
-import { createTRPCRouter, protectedProcedure } from '@/trpc/init';
+import { createTRPCRouter, premiumProcedure, protectedProcedure } from '@/trpc/init';
 import { agentsInsertSchema, agentsUpdateSchema } from '../schemas';
 import { and, count, desc, eq, getTableColumns, ilike, sql } from 'drizzle-orm';
 import {
@@ -172,7 +172,7 @@ export const agentsRouter = createTRPCRouter({
     }),
   // Defines a new API endpoint called "create" for creating agents
   //protectedProcedure means:Only authenticated users can call this endpoint
-  create: protectedProcedure
+  create: premiumProcedure('agents')
     // Applies the agentsInsertSchema validation rules to incoming data
     .input(agentsInsertSchema)
     // The user's authentication info is available in the ctx (context)

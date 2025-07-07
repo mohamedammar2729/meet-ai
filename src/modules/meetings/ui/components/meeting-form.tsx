@@ -24,6 +24,7 @@ import { useState } from 'react';
 import { CommandSelect } from '@/components/command-select';
 import { GeneratedAvatar } from '@/components/generated-avatar';
 import { NewAgentDialog } from '@/modules/agents/ui/components/new-agent-dialog';
+import { useRouter } from 'next/navigation';
 
 interface MeetingFormProps {
   onSuccess?: (id?: string) => void;
@@ -37,6 +38,7 @@ export const MeetingForm = ({
   initialValues,
 }: MeetingFormProps) => {
   const trpc = useTRPC();
+    const router = useRouter();
   const queryClient = useQueryClient();
 
   const [agentSearch, setAgentSearch] = useState('');
@@ -63,6 +65,10 @@ export const MeetingForm = ({
       onError: (error) => {
         toast.error(error.message);
         //TODO: Check if the error code is `FORBIDDEN`, redirect to "/upgrade"
+        if (error.data?.code === 'FORBIDDEN') {
+          // Redirect to the upgrade page
+          router.push('/upgrade');
+        }
       },
     })
   );
@@ -73,6 +79,9 @@ export const MeetingForm = ({
         // Invalidate the queries to refetch the data
         await queryClient.invalidateQueries(
           trpc.meetings.getMany.queryOptions({})
+        );
+        await queryClient.invalidateQueries(
+          trpc.premium.getFreeUsage.queryOptions()
         );
         // If we are editing an existing meeting, we need to refetch the meeting details
         // to update the meeting details in the list
