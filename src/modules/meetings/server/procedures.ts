@@ -1,8 +1,18 @@
 import { db } from '@/db';
 import { z } from 'zod';
-import { agents, meetings } from '@/db/schema';
+import JSONL from 'jsonl-parse-stringify';
+import { agents, meetings, user } from '@/db/schema';
 import { createTRPCRouter, protectedProcedure } from '@/trpc/init';
-import { and, count, desc, eq, getTableColumns, ilike, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  ilike,
+  inArray,
+  sql,
+} from 'drizzle-orm';
 import {
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
@@ -11,12 +21,120 @@ import {
 } from '@/constants';
 import { TRPCError } from '@trpc/server';
 import { meetingsInsertSchema, meetingsUpdateSchema } from '../schemas';
-import { MeetingStatus } from '../types';
+import { MeetingStatus, StreamTranscriptItem } from '../types';
 import { streamVideo } from '@/lib/stream-video';
 import { generateAvatarUri } from '@/lib/avatar';
+import { streamChat } from '@/lib/stream-chat';
 
 // This is a tRPC helper function. It is used to create a group of API endpoints (we call these procedures).
 export const meetingsRouter = createTRPCRouter({
+  generateChatToken: protectedProcedure.mutation(async ({ ctx }) => {
+    const token = streamChat.createToken(ctx.auth.user.id);
+    await streamChat.upsertUser({
+      id: ctx.auth.user.id,
+      role: 'admin',
+    });
+    return token;
+  }),
+
+  getTranscript: protectedProcedure
+    // Defines the input validation for this procedure, Requires an object with an id field that must
+    .input(z.object({ id: z.string() }))
+    // Defines this as a query operation (read-only, doesn't modify data)
+    .query(async ({ input, ctx }) => {
+      // Uses array destructuring because Drizzle returns arrays, but we only want the first item
+      const [existingMeeting] = await db
+        .select()
+        .from(meetings)
+        .where(
+          and(
+            eq(meetings.id, input.id), // Checks if the meeting ID matches the input
+            eq(meetings.userId, ctx.auth.user.id) // Ensures the meeting belongs to the authenticated user
+          )
+        );
+      // If no Meeting is found, existingMeeting will be undefined
+      if (!existingMeeting) {
+        // Throws an error if the Meeting does not exist
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Meeting not found',
+        });
+      }
+
+      if (!existingMeeting.transcriptUrl) {
+        return [];
+      }
+
+      // Fetches the transcript for the meeting using Stream Video SDK
+      const transcript = await fetch(existingMeeting.transcriptUrl)
+        .then((res) => res.text())
+        .then((text) => {
+          // Parses the JSONL (JSON Lines) format into an array of objects
+          return JSONL.parse<StreamTranscriptItem>(text);
+        })
+        .catch(() => {
+          return [];
+        });
+
+      const speakerIds = [
+        ...new Set(transcript.map((item) => item.speaker_id)),
+      ];
+
+      const userSpeakers = await db
+        .select()
+        .from(user)
+        .where(inArray(user.id, speakerIds))
+        .then((users) =>
+          users.map((user) => ({
+            ...user,
+            image:
+              user.image ??
+              generateAvatarUri({
+                seed: user.name,
+                variant: 'initials',
+              }),
+          }))
+        );
+      const agentSpeakers = await db
+        .select()
+        .from(agents)
+        .where(inArray(agents.id, speakerIds))
+        .then((agents) =>
+          agents.map((agent) => ({
+            ...agent,
+            image: generateAvatarUri({
+              seed: agent.name,
+              variant: 'botttsNeutral',
+            }),
+          }))
+        );
+
+      const speakers = [...userSpeakers, ...agentSpeakers];
+      const transcriptWithSpeakers = transcript.map((item) => {
+        const speaker = speakers.find((s) => s.id === item.speaker_id);
+        if (!speaker) {
+          return {
+            ...item,
+            user: {
+              name: 'Unknown Speaker',
+              image: generateAvatarUri({
+                seed: 'unknown',
+                variant: 'initials',
+              }),
+            },
+          };
+        }
+        return {
+          ...item,
+          user: {
+            name: speaker.name,
+            image: speaker.image,
+          },
+        };
+      });
+      return transcriptWithSpeakers;
+    }),
+
   generateToken: protectedProcedure.mutation(async ({ ctx }) => {
     // add user to stream video list of users
     await streamVideo.upsertUsers([
