@@ -2,7 +2,7 @@ import { db } from '@/db';
 import { z } from 'zod';
 import JSONL from 'jsonl-parse-stringify';
 import { agents, meetings, user } from '@/db/schema';
-import { createTRPCRouter, protectedProcedure } from '@/trpc/init';
+import { createTRPCRouter, premiumProcedure, protectedProcedure } from '@/trpc/init';
 import {
   and,
   count,
@@ -166,7 +166,7 @@ export const meetingsRouter = createTRPCRouter({
   }),
 
   // Defines a new API endpoint called "create" for creating meetings
-  create: protectedProcedure
+  create: premiumProcedure('meetings')
     // Applies the meetingsInsertSchema validation rules to incoming data
     .input(meetingsInsertSchema)
     // The user's authentication info is available in the ctx (context)
