@@ -1,9 +1,9 @@
 import { db } from '@/db';
 import { z } from 'zod';
-import { agents } from '@/db/schema';
+import { agents, meetings } from '@/db/schema';
 import { createTRPCRouter, premiumProcedure, protectedProcedure } from '@/trpc/init';
 import { agentsInsertSchema, agentsUpdateSchema } from '../schemas';
-import { and, count, desc, eq, getTableColumns, ilike, sql } from 'drizzle-orm';
+import { and, count, desc, eq, getTableColumns, ilike } from 'drizzle-orm';
 import {
   DEFAULT_PAGE,
   DEFAULT_PAGE_SIZE,
@@ -80,9 +80,8 @@ export const agentsRouter = createTRPCRouter({
       // Uses array destructuring because Drizzle returns arrays, but we only want the first item
       const [existingAgent] = await db
         .select({
-          meetingCount: sql<number>`5`,
-          // Spreads all actual columns from the agents table
           ...getTableColumns(agents),
+          meetingCount: db.$count(meetings, eq(agents.id, meetings.agentId)),
         })
         // Specifies we're querying from the agents table
         .from(agents)
@@ -127,9 +126,8 @@ export const agentsRouter = createTRPCRouter({
       // Database query setup like the previous one, but with pagination and search
       const data = await db
         .select({
-          meetingCount: sql<number>`5`,
-          // to preserve other fields used ...getTebleColumns
           ...getTableColumns(agents),
+          meetingCount: db.$count(meetings, eq(agents.id, meetings.agentId)),
         })
         // Specifies we're querying from the agents table
         .from(agents)
@@ -139,7 +137,7 @@ export const agentsRouter = createTRPCRouter({
             // Only shows agents belonging to the authenticated user
             eq(agents.userId, ctx.auth.user.id),
             // If search term exists, filter by agent name using case-insensitive partial matching
-            search?ilike(agents.name, `%${search}%`) : undefined
+            search ? ilike(agents.name, `%${search}%`) : undefined
           )
         )
         // if two agents have the same creation date, order by ID in descending order
